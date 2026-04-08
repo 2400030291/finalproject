@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -6,16 +6,33 @@ import { Progress } from '../components/ui/progress';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Search, MapPin, Users, Clock, TrendingUp } from 'lucide-react';
-import { pollingStations } from '../data/mockData';
+import { pollingStationsApi } from '../services/api';
+import type { PollingStation } from '../services/api';
 
 export function PollingStations() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [districtFilter, setDistrictFilter] = useState<string>('all');
+  const [allStations, setAllStations] = useState<PollingStation[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const districts = Array.from(new Set(pollingStations.map(ps => ps.district)));
+  useEffect(() => {
+    async function fetchStations() {
+      try {
+        const data = await pollingStationsApi.getAll();
+        setAllStations(data);
+      } catch (err) {
+        console.error('Failed to fetch polling stations:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchStations();
+  }, []);
 
-  const filteredStations = pollingStations.filter(station => {
+  const districts = Array.from(new Set(allStations.map(ps => ps.district)));
+
+  const filteredStations = allStations.filter(station => {
     const matchesSearch = station.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          station.location.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || station.status === statusFilter;
@@ -37,6 +54,17 @@ export function PollingStations() {
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading polling stations...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -89,7 +117,7 @@ export function PollingStations() {
       {/* Results Count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Showing {filteredStations.length} of {pollingStations.length} polling stations
+          Showing {filteredStations.length} of {allStations.length} polling stations
         </p>
         <Button variant="outline" size="sm">
           Export Data
@@ -99,7 +127,7 @@ export function PollingStations() {
       {/* Polling Stations Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredStations.map((station) => (
-          <Card key={station.id} className="hover:shadow-md transition-shadow">
+          <Card key={station._id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -119,7 +147,7 @@ export function PollingStations() {
                 {/* District & ID */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Station ID:</span>
-                  <span className="font-medium">{station.id}</span>
+                  <span className="font-medium">{station.stationId}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">District:</span>

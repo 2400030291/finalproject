@@ -11,28 +11,55 @@ import { Sun, Moon, Mail, ExternalLink, CheckCircle2, FileText, MapPin, Users, S
 import { motion } from 'motion/react';
 import logoImage from "../../assets/logo.png";
 import { toast } from 'sonner';
+import { authApi } from '../services/api';
 
 export function LandingPage() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Login successful! Redirecting...');
-    setTimeout(() => {
-      setIsAuthOpen(false);
-      navigate('/app');
-    }, 1000);
+    setLoading(true);
+    try {
+      const data = await authApi.login(loginEmail, loginPassword);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      toast.success('Login successful! Redirecting...');
+      setTimeout(() => {
+        setIsAuthOpen(false);
+        navigate('/app');
+      }, 1000);
+    } catch (err: any) {
+      toast.error(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Account created! Redirecting...');
-    setTimeout(() => {
-      setIsAuthOpen(false);
-      navigate('/app');
-    }, 1000);
+    setLoading(true);
+    try {
+      const data = await authApi.register(signupName, signupEmail, signupPassword);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      toast.success('Account created! Redirecting...');
+      setTimeout(() => {
+        setIsAuthOpen(false);
+        navigate('/app');
+      }, 1000);
+    } catch (err: any) {
+      toast.error(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const electionInfo = [
@@ -120,14 +147,14 @@ export function LandingPage() {
                       <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" placeholder="your@email.com" required />
+                          <Input id="email" type="email" placeholder="your@email.com" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="password">Password</Label>
-                          <Input id="password" type="password" placeholder="••••••••" required />
+                          <Input id="password" type="password" placeholder="••••••••" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
                         </div>
-                        <Button type="submit" className="w-full bg-gradient-to-r from-orange-600 to-green-600">
-                          Login
+                        <Button type="submit" className="w-full bg-gradient-to-r from-orange-600 to-green-600" disabled={loading}>
+                          {loading ? 'Logging in...' : 'Login'}
                         </Button>
                       </form>
                     </TabsContent>
@@ -135,18 +162,18 @@ export function LandingPage() {
                       <form onSubmit={handleSignup} className="space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="name">Full Name</Label>
-                          <Input id="name" placeholder="Your Name" required />
+                          <Input id="name" placeholder="Your Name" required value={signupName} onChange={e => setSignupName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="signup-email">Email</Label>
-                          <Input id="signup-email" type="email" placeholder="your@email.com" required />
+                          <Input id="signup-email" type="email" placeholder="your@email.com" required value={signupEmail} onChange={e => setSignupEmail(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="signup-password">Password</Label>
-                          <Input id="signup-password" type="password" placeholder="••••••••" required />
+                          <Input id="signup-password" type="password" placeholder="••••••••" required value={signupPassword} onChange={e => setSignupPassword(e.target.value)} />
                         </div>
-                        <Button type="submit" className="w-full bg-gradient-to-r from-orange-600 to-green-600">
-                          Create Account
+                        <Button type="submit" className="w-full bg-gradient-to-r from-orange-600 to-green-600" disabled={loading}>
+                          {loading ? 'Creating Account...' : 'Create Account'}
                         </Button>
                       </form>
                     </TabsContent>

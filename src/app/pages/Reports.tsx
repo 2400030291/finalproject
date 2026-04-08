@@ -1,14 +1,33 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { FileText, Download, Calendar, TrendingUp, Users, AlertTriangle, FileBarChart } from 'lucide-react';
-import { candidates, pollingStations, incidents } from '../data/mockData';
+import { dashboardApi } from '../services/api';
+import type { DashboardSummary } from '../services/api';
 
 export function Reports() {
-  const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
-  const totalVoters = pollingStations.reduce((sum, ps) => ps.totalVoters, 0);
-  const turnout = ((pollingStations.reduce((sum, ps) => sum + ps.votedCount, 0) / totalVoters) * 100).toFixed(1);
-  const openIncidents = incidents.filter(i => i.status !== 'resolved').length;
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSummary() {
+      try {
+        const data = await dashboardApi.getSummary();
+        setSummary(data);
+      } catch (err) {
+        console.error('Failed to fetch summary:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSummary();
+  }, []);
+
+  const totalVotes = summary?.totalVotes ?? 0;
+  const turnout = summary?.averageTurnout?.toFixed(1) ?? '0';
+  const stationCount = summary?.totalStations ?? 0;
+  const openIncidents = summary?.openIncidents ?? 0;
 
   const reports = [
     {
@@ -91,6 +110,17 @@ export function Reports() {
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading reports...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -156,7 +186,7 @@ export function Reports() {
                 <FileText className="w-4 h-4 text-purple-600" />
                 <p className="text-xs text-gray-500">Active Stations</p>
               </div>
-              <p className="text-xl font-semibold text-gray-900">{pollingStations.length}</p>
+              <p className="text-xl font-semibold text-gray-900">{stationCount}</p>
             </div>
             <div className="bg-white rounded-lg p-4 border border-blue-100">
               <div className="flex items-center gap-2 mb-2">

@@ -21,6 +21,8 @@ export function Root() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/');
   };
 

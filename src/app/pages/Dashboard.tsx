@@ -1,15 +1,56 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Users, MapPin, TrendingUp, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { Progress } from '../components/ui/progress';
 import { Badge } from '../components/ui/badge';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { candidates, pollingStations, incidents, timeSeriesData } from '../data/mockData';
+import { candidatesApi, pollingStationsApi, incidentsApi, resultsApi } from '../services/api';
+import type { Candidate, PollingStation, Incident, TimeSeriesDataPoint } from '../services/api';
 
 export function Dashboard() {
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [pollingStations, setPollingStations] = useState<PollingStation[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesDataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [c, ps, inc, ts] = await Promise.all([
+          candidatesApi.getAll(),
+          pollingStationsApi.getAll(),
+          incidentsApi.getAll(),
+          resultsApi.getTimeSeries(),
+        ]);
+        setCandidates(c);
+        setPollingStations(ps);
+        setIncidents(inc);
+        setTimeSeriesData(ts);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
   const totalVoters = pollingStations.reduce((sum, ps) => sum + ps.totalVoters, 0);
   const totalVoted = pollingStations.reduce((sum, ps) => sum + ps.votedCount, 0);
-  const averageTurnout = (totalVoted / totalVoters) * 100;
+  const averageTurnout = totalVoters > 0 ? (totalVoted / totalVoters) * 100 : 0;
   const activeStations = pollingStations.filter(ps => ps.status === 'active').length;
   const openIncidents = incidents.filter(i => i.status !== 'resolved').length;
   const criticalIncidents = incidents.filter(i => i.severity === 'critical').length;
@@ -64,11 +105,11 @@ export function Dashboard() {
             <TrendingUp className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{candidates[0].name}</div>
-            <p className="text-xs text-gray-500 mt-1">{candidates[0].party}</p>
+            <div className="text-2xl font-semibold">{candidates[0]?.name ?? 'N/A'}</div>
+            <p className="text-xs text-gray-500 mt-1">{candidates[0]?.party ?? ''}</p>
             <div className="flex items-center gap-2 mt-2">
-              <Progress value={candidates[0].percentage} className="flex-1" />
-              <span className="text-sm font-medium">{candidates[0].percentage}%</span>
+              <Progress value={candidates[0]?.percentage ?? 0} className="flex-1" />
+              <span className="text-sm font-medium">{candidates[0]?.percentage ?? 0}%</span>
             </div>
           </CardContent>
         </Card>
@@ -112,7 +153,7 @@ export function Dashboard() {
                   label={(entry) => `${entry.percentage}%`}
                 >
                   {candidates.map((candidate) => (
-                    <Cell key={candidate.id} fill={candidate.color} />
+                    <Cell key={candidate._id} fill={candidate.color} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value: number) => value.toLocaleString()} />
@@ -156,7 +197,7 @@ export function Dashboard() {
               <Legend />
               <Bar dataKey="votes" radius={[8, 8, 0, 0]}>
   {candidates.map((entry) => (
-    <Cell key={entry.id} fill={entry.color} />
+    <Cell key={entry._id} fill={entry.color} />
   ))}
 </Bar>
             </BarChart>
@@ -174,7 +215,7 @@ export function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {incidents.slice(0, 5).map((incident) => (
-                <div key={incident.id} className="flex items-start gap-3 pb-3 border-b last:border-0">
+                <div key={incident._id} className="flex items-start gap-3 pb-3 border-b last:border-0">
                   <div className={`mt-0.5 p-1.5 rounded-full ${
                     incident.severity === 'critical' ? 'bg-red-100' :
                     incident.severity === 'high' ? 'bg-orange-100' :
@@ -212,11 +253,11 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {pollingStations
+              {[...pollingStations]
                 .sort((a, b) => b.turnoutPercentage - a.turnoutPercentage)
                 .slice(0, 6)
                 .map((station) => (
-                  <div key={station.id} className="space-y-2">
+                  <div key={station._id} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{station.name}</p>

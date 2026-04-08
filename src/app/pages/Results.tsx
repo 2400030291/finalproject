@@ -1,16 +1,51 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Trophy, TrendingUp, Users } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { candidates, districtResults } from '../data/mockData';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { candidatesApi, resultsApi } from '../services/api';
+import type { Candidate, DistrictResult } from '../services/api';
 
 export function Results() {
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [districtResults, setDistrictResults] = useState<DistrictResult[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [c, dr] = await Promise.all([
+          candidatesApi.getAll(),
+          resultsApi.getDistricts(),
+        ]);
+        setCandidates(c);
+        setDistrictResults(dr);
+      } catch (err) {
+        console.error('Failed to fetch results:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading results...</p>
+        </div>
+      </div>
+    );
+  }
+
   const totalVotes = candidates.reduce((sum, c) => sum + c.votes, 0);
   const leadingCandidate = candidates[0];
   const secondPlace = candidates[1];
-  const voteDifference = leadingCandidate.votes - secondPlace.votes;
+  const voteDifference = leadingCandidate && secondPlace ? leadingCandidate.votes - secondPlace.votes : 0;
 
   return (
     <div className="space-y-6">
@@ -39,8 +74,8 @@ export function Results() {
             <Trophy className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{leadingCandidate.name}</div>
-            <p className="text-xs text-gray-500 mt-1">{leadingCandidate.percentage}% of votes</p>
+            <div className="text-2xl font-semibold">{leadingCandidate?.name ?? 'N/A'}</div>
+            <p className="text-xs text-gray-500 mt-1">{leadingCandidate?.percentage ?? 0}% of votes</p>
           </CardContent>
         </Card>
 
@@ -64,7 +99,7 @@ export function Results() {
         <CardContent>
           <div className="space-y-6">
             {candidates.map((candidate, index) => (
-              <div key={candidate.id} className="space-y-2">
+              <div key={candidate._id} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-semibold text-sm">
@@ -123,7 +158,7 @@ export function Results() {
                     label={(entry) => `${entry.name}: ${entry.percentage}%`}
                   >
                     {candidates.map((candidate) => (
-                      <Cell key={candidate.id} fill={candidate.color} />
+                      <Cell key={candidate._id} fill={candidate.color} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => value.toLocaleString()} />
@@ -146,9 +181,9 @@ export function Results() {
                   <YAxis />
                   <Tooltip formatter={(value: number) => value.toLocaleString()} />
                   <Legend />
-                  <Bar dataKey="candidate1" name={candidates[0].name} fill={candidates[0].color} />
-                  <Bar dataKey="candidate2" name={candidates[1].name} fill={candidates[1].color} />
-                  <Bar dataKey="candidate3" name={candidates[2].name} fill={candidates[2].color} />
+                  {candidates[0] && <Bar dataKey="candidate1" name={candidates[0].name} fill={candidates[0].color} />}
+                  {candidates[1] && <Bar dataKey="candidate2" name={candidates[1].name} fill={candidates[1].color} />}
+                  {candidates[2] && <Bar dataKey="candidate3" name={candidates[2].name} fill={candidates[2].color} />}
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -166,7 +201,7 @@ export function Results() {
                     <tr>
                       <th className="text-left py-3 px-4">District</th>
                       {candidates.map((candidate) => (
-                        <th key={candidate.id} className="text-right py-3 px-4">{candidate.name}</th>
+                        <th key={candidate._id} className="text-right py-3 px-4">{candidate.name}</th>
                       ))}
                       <th className="text-right py-3 px-4">Total</th>
                     </tr>
@@ -206,7 +241,7 @@ export function Results() {
                   <Tooltip formatter={(value: number) => value.toLocaleString()} />
                   <Bar dataKey="votes" radius={[0, 8, 8, 0]}>
                     {candidates.map((candidate) => (
-                      <Cell key={candidate.id} fill={candidate.color} />
+                      <Cell key={candidate._id} fill={candidate.color} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -217,7 +252,7 @@ export function Results() {
           {/* Vote Share Comparison */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {candidates.map((candidate) => (
-              <Card key={candidate.id}>
+              <Card key={candidate._id}>
                 <CardHeader>
                   <CardTitle className="text-base">{candidate.name}</CardTitle>
                 </CardHeader>

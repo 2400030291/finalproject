@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -8,15 +8,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { AlertCircle, Clock, MapPin, User, Plus, Filter } from 'lucide-react';
-import { incidents } from '../data/mockData';
 import { toast } from 'sonner';
+import { incidentsApi } from '../services/api';
+import type { Incident } from '../services/api';
 
 export function Incidents() {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [allIncidents, setAllIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredIncidents = incidents.filter(incident => {
+  // Form state
+  const [formTitle, setFormTitle] = useState('');
+  const [formLocation, setFormLocation] = useState('');
+  const [formSeverity, setFormSeverity] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formReporter, setFormReporter] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchIncidents = async () => {
+    try {
+      const data = await incidentsApi.getAll();
+      setAllIncidents(data);
+    } catch (err) {
+      console.error('Failed to fetch incidents:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIncidents();
+  }, []);
+
+  const filteredIncidents = allIncidents.filter(incident => {
     const matchesSeverity = severityFilter === 'all' || incident.severity === severityFilter;
     const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
     return matchesSeverity && matchesStatus;
@@ -50,15 +76,49 @@ export function Incidents() {
     }
   };
 
-  const handleSubmitIncident = (e: React.FormEvent) => {
+  const handleSubmitIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Incident reported successfully');
-    setIsDialogOpen(false);
+    setSubmitting(true);
+    try {
+      await incidentsApi.create({
+        title: formTitle,
+        description: formDescription,
+        severity: formSeverity,
+        location: formLocation,
+        reportedBy: formReporter,
+        pollingStationId: 'PS000',
+      });
+      toast.success('Incident reported successfully');
+      setIsDialogOpen(false);
+      // Reset form
+      setFormTitle('');
+      setFormLocation('');
+      setFormSeverity('');
+      setFormDescription('');
+      setFormReporter('');
+      // Refresh the list
+      await fetchIncidents();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to report incident');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const criticalCount = incidents.filter(i => i.severity === 'critical').length;
-  const openCount = incidents.filter(i => i.status === 'open').length;
-  const investigatingCount = incidents.filter(i => i.status === 'investigating').length;
+  const criticalCount = allIncidents.filter(i => i.severity === 'critical').length;
+  const openCount = allIncidents.filter(i => i.status === 'open').length;
+  const investigatingCount = allIncidents.filter(i => i.status === 'investigating').length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading incidents...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,15 +145,15 @@ export function Incidents() {
             <form onSubmit={handleSubmitIncident} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Incident Title</Label>
-                <Input id="title" placeholder="Brief description of the incident" required />
+                <Input id="title" placeholder="Brief description of the incident" required value={formTitle} onChange={e => setFormTitle(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="location">Location</Label>
-                <Input id="location" placeholder="Polling station or address" required />
+                <Input id="location" placeholder="Polling station or address" required value={formLocation} onChange={e => setFormLocation(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="severity">Severity Level</Label>
-                <Select required>
+                <Select value={formSeverity} onValueChange={setFormSeverity} required>
                   <SelectTrigger id="severity">
                     <SelectValue placeholder="Select severity" />
                   </SelectTrigger>
@@ -112,18 +172,20 @@ export function Incidents() {
                   placeholder="Detailed description of the incident"
                   rows={4}
                   required 
+                  value={formDescription}
+                  onChange={e => setFormDescription(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reporter">Reporter Name</Label>
-                <Input id="reporter" placeholder="Your name or observer ID" required />
+                <Input id="reporter" placeholder="Your name or observer ID" required value={formReporter} onChange={e => setFormReporter(e.target.value)} />
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1">
-                  Submit Report
+                <Button type="submit" className="flex-1" disabled={submitting}>
+                  {submitting ? 'Submitting...' : 'Submit Report'}
                 </Button>
               </div>
             </form>
@@ -138,7 +200,7 @@ export function Incidents() {
             <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{incidents.length}</div>
+            <div className="text-2xl font-semibold">{allIncidents.length}</div>
             <p className="text-xs text-gray-500 mt-1">All reported incidents</p>
           </CardContent>
         </Card>
@@ -208,14 +270,14 @@ export function Incidents() {
       {/* Results Count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">
-          Showing {filteredIncidents.length} of {incidents.length} incidents
+          Showing {filteredIncidents.length} of {allIncidents.length} incidents
         </p>
       </div>
 
       {/* Incidents List */}
       <div className="space-y-4">
         {filteredIncidents.map((incident) => (
-          <Card key={incident.id} className="hover:shadow-md transition-shadow">
+          <Card key={incident._id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1">
